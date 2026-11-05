@@ -8,6 +8,11 @@ image and restart"; migrations run automatically (see
 
 ## [Unreleased]
 
+## [1.3.1-rs.2] - 2026-11-05
+
+### Fixed
+- Release workflow: invalid YAML in the release-branch check (1.3.1-rs.1 was never published).
+
 ## [1.3.1-rs.1] - 2026-11-05
 
 Fork for Buchhaltungsservice RS (https://github.com/danielrajanigl/opencalendar), based on 1.3.1.
