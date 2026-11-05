@@ -19,6 +19,7 @@ import type { Answer, Answers } from "../responses";
 import { createBookingAction } from "../server/public-actions";
 import { solveCaptcha } from "./captcha";
 import { QuestionField } from "./question-field";
+import { useGuestText } from "@/features/i18n/guest-text";
 
 export type BookingFormConfig = {
   /** Personal host, or "a+b" for a dynamic group (TEAM-009); empty for a team. */
@@ -53,11 +54,10 @@ type Props = {
   onTaken: () => void;
 };
 
-const FREQUENCY_WORD = { weekly: "week", monthly: "month" } as const;
-
 /** The booker's details form: identity, guests, location, questions, series length (BKG-004). */
 export function BookingForm({ config, slot, duration, prefs, tokens, onBack, onTaken }: Props) {
   const router = useRouter();
+  const { t } = useGuestText();
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<{ message: string; fields?: Record<string, string> } | null>(null);
   const [locationIndex, setLocationIndex] = useState(0);
@@ -133,37 +133,37 @@ export function BookingForm({ config, slot, duration, prefs, tokens, onBack, onT
     setSubmitting(false);
     setError({ message: result.message, fields: result.fieldErrors });
     emitEmbed("bookingFailed", { message: result.message });
-    if (/taken/.test(result.message)) onTaken();
+    if (result.code === "SLOT_UNAVAILABLE") onTaken();
   };
 
-  const verb = config.reschedule ? "Confirm new time" : config.requiresConfirmation ? "Request booking" : "Confirm booking";
+  const verb = config.reschedule ? t.form.confirmNewTime : config.requiresConfirmation ? t.form.request : t.form.confirm;
 
   return (
     <form onSubmit={submit} className="flex max-w-md flex-col gap-4">
       <div>
         <Button type="button" variant="ghost" className="-ml-2.5" onClick={onBack}>
-          <ChevronLeft className="size-4" aria-hidden /> Back
+          <ChevronLeft className="size-4" aria-hidden /> {t.form.back}
         </Button>
         <p className="font-medium">
           {formatDateLong(slot.start, prefs)}, {formatTime(slot.start, prefs)} – {formatTime(slot.end, prefs)}
         </p>
         <p className="text-sm text-muted-foreground">{prefs.timeZone.replaceAll("_", " ")}</p>
       </div>
-      <FormField label="Your name" htmlFor="name" error={error?.fields?.["booker.name"]}>
+      <FormField label={t.form.name} htmlFor="name" error={error?.fields?.["booker.name"]}>
         <Input id="name" name="name" autoComplete="name" required maxLength={100} defaultValue={config.reschedule?.name ?? config.prefill.name} />
       </FormField>
-      <FormField label="Email" htmlFor="email" error={error?.fields?.["booker.email"]}>
+      <FormField label={t.form.email} htmlFor="email" error={error?.fields?.["booker.email"]}>
         <Input id="email" name="email" type="email" autoComplete="email" required defaultValue={config.reschedule?.email ?? config.prefill.email} />
       </FormField>
       {config.maxGuests > 0 && !config.reschedule && (showGuests || error?.fields?.guests) && (
-        <FormField label="Guests (optional)" htmlFor="guests" hint={`Up to ${config.maxGuests} emails, separated by commas.`} error={error?.fields?.guests}>
+        <FormField label={t.form.guests} htmlFor="guests" hint={t.form.guestsHint(config.maxGuests)} error={error?.fields?.guests}>
           <Input id="guests" name="guests" autoFocus={showGuests} />
         </FormField>
       )}
       {config.locations.length > 1 && (
         <FieldSet className="gap-1.5">
           <FieldLegend variant="label" className="mb-1">
-            Location
+            {t.form.location}
           </FieldLegend>
           <RadioGroup name="location" value={String(locationIndex)} onValueChange={(v) => setLocationIndex(Number(v))}>
             {config.locations.map((loc, i) => (
@@ -178,7 +178,7 @@ export function BookingForm({ config, slot, duration, prefs, tokens, onBack, onT
         </FieldSet>
       )}
       {chosenKind === "phone_attendee" && (
-        <FormField label="Your phone number" htmlFor="phone" hint="International format, e.g. +1 415 555 0100" error={error?.fields?.phone}>
+        <FormField label={t.form.phone} htmlFor="phone" hint={t.form.phoneHint} error={error?.fields?.phone}>
           <Input id="phone" name="phone" type="tel" autoComplete="tel" required />
         </FormField>
       )}
@@ -186,7 +186,7 @@ export function BookingForm({ config, slot, duration, prefs, tokens, onBack, onT
         <QuestionField key={q.key} question={q} value={answers[q.key]} error={error?.fields?.[`answers.${q.key}`]} onChange={(v) => setAnswer(q.key, v)} />
       ))}
       {config.recurring && !config.reschedule && (
-        <FormField label="Number of occurrences" htmlFor="occurrences" hint={`Repeats every ${FREQUENCY_WORD[config.recurring.frequency]} at the same time.`}>
+        <FormField label={t.form.occurrences} htmlFor="occurrences" hint={t.form.occurrencesHint(config.recurring.frequency)}>
           <Select value={String(count)} onValueChange={(v) => setCount(Number(v))}>
             <SelectTrigger id="occurrences" className="w-full">
               <SelectValue />
@@ -194,7 +194,7 @@ export function BookingForm({ config, slot, duration, prefs, tokens, onBack, onT
             <SelectContent>
               {Array.from({ length: config.recurring.maxCount }, (_, i) => i + 1).map((n) => (
                 <SelectItem key={n} value={String(n)}>
-                  {n === 1 ? "Just this once" : `${n} times`}
+                  {n === 1 ? t.form.justOnce : t.form.times(n)}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -202,7 +202,7 @@ export function BookingForm({ config, slot, duration, prefs, tokens, onBack, onT
         </FormField>
       )}
       {showNotes && (
-        <FormField label="Notes (optional)" htmlFor="notes">
+        <FormField label={t.form.notes} htmlFor="notes" hint={t.form.notesHint || undefined}>
           <Textarea id="notes" name="notes" maxLength={2000} defaultValue={config.prefill.notes} autoFocus={!config.prefill.notes} className="min-h-20" />
         </FormField>
       )}
@@ -210,17 +210,17 @@ export function BookingForm({ config, slot, duration, prefs, tokens, onBack, onT
         <div className="-ml-2.5 flex flex-wrap gap-1">
           {config.maxGuests > 0 && !config.reschedule && !showGuests && !error?.fields?.guests && (
             <Button type="button" variant="ghost" size="sm" onClick={() => setShowGuests(true)}>
-              <Plus className="size-4" aria-hidden /> Add guests
+              <Plus className="size-4" aria-hidden /> {t.form.addGuests}
             </Button>
           )}
           {!showNotes && (
             <Button type="button" variant="ghost" size="sm" onClick={() => setShowNotes(true)}>
-              <Plus className="size-4" aria-hidden /> Add a note
+              <Plus className="size-4" aria-hidden /> {t.form.addNote}
             </Button>
           )}
         </div>
       )}
-      {config.requiresConfirmation && !config.reschedule && <p className="text-sm text-muted-foreground">The host will confirm this booking before it’s final.</p>}
+      {config.requiresConfirmation && !config.reschedule && <p className="text-sm text-muted-foreground">{t.form.needsConfirmation}</p>}
       {error && (
         <Alert variant="destructive">
           <AlertDescription>{error.message}</AlertDescription>
@@ -230,7 +230,7 @@ export function BookingForm({ config, slot, duration, prefs, tokens, onBack, onT
       <div className="sticky bottom-0 -mx-4 border-t border-border bg-card px-4 py-3 @lg/booker:-mx-6 @lg/booker:px-6 @xl/panel:static @xl/panel:mx-0 @xl/panel:border-0 @xl/panel:bg-transparent @xl/panel:p-0">
         <Button type="submit" size="lg" disabled={submitting} className="w-full">
           {submitting && <Spinner />}
-          {submitting ? "Sending…" : verb}
+          {submitting ? t.form.sending : verb}
         </Button>
       </div>
     </form>

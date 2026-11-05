@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import type { Question } from "@/features/event-types/schemas";
 import type { Answer } from "../responses";
+import { useGuestText } from "@/features/i18n/guest-text";
 
 type Props = { question: Question; value: Answer | undefined; error?: string; onChange: (value: Answer | undefined) => void };
 
@@ -17,6 +18,7 @@ const NONE = "__none";
 
 /** One booking question (EVT-009), rendered by type with an accessible label. */
 export function QuestionField({ question: q, value, error, onChange }: Props) {
+  const { t } = useGuestText();
   const id = `q-${q.key}`;
   const label = `${q.label}${q.required ? "" : " (optional)"}`;
   const str = typeof value === "string" || typeof value === "number" ? String(value) : "";
@@ -107,10 +109,10 @@ export function QuestionField({ question: q, value, error, onChange }: Props) {
       ) : q.type === "select" ? (
         <Select required={q.required} value={str} onValueChange={(v) => onChange(v === NONE ? undefined : v)}>
           <SelectTrigger id={id} className="w-full" aria-invalid={error ? true : undefined} aria-describedby={describedBy}>
-            <SelectValue placeholder={q.placeholder ?? "Choose…"} />
+            <SelectValue placeholder={q.placeholder ?? t.form.choose} />
           </SelectTrigger>
           <SelectContent>
-            {!q.required && <SelectItem value={NONE}>{q.placeholder ?? "Choose…"}</SelectItem>}
+            {!q.required && <SelectItem value={NONE}>{q.placeholder ?? t.form.choose}</SelectItem>}
             {q.options.map((o) => (
               <SelectItem key={o} value={o}>
                 {o}

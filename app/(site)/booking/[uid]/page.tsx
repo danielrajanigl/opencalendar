@@ -14,9 +14,13 @@ import { attendeeMayCancel, remainingOccurrences } from "@/features/bookings/ser
 import { findBookingForManage } from "@/features/bookings/server/service";
 import { googleCalendarUrl, outlookCalendarUrl } from "@/lib/calendar-links";
 import { requestTime } from "@/lib/clock";
+import { getEnv } from "@/lib/env";
+import { guestText, type GuestText } from "@/lib/i18n/guest";
 
 // The URL carries the manage token: never send it as a referrer, never index it.
-export const metadata: Metadata = { title: "Your booking", robots: { index: false }, referrer: "no-referrer" };
+export function generateMetadata(): Metadata {
+  return { title: guestText(getEnv().GUEST_LANGUAGE).confirmation.pageTitle, robots: { index: false }, referrer: "no-referrer" };
+}
 
 /**
  * Confirmation and self-service page (BKG-007/008/009). With a valid manage token the booker
@@ -25,6 +29,7 @@ export const metadata: Metadata = { title: "Your booking", robots: { index: fals
 export default async function BookingPage({ params, searchParams }: PageProps<"/booking/[uid]">) {
   const { uid } = await params;
   const { token, new: isNew } = await searchParams;
+  const t = guestText(getEnv().GUEST_LANGUAGE).confirmation;
   const tokenValue = typeof token === "string" ? token : null;
   const found = await findBookingForManage(getDb(), uid, tokenValue);
   if (!found) notFound();
@@ -48,7 +53,7 @@ export default async function BookingPage({ params, searchParams }: PageProps<"/
   const location = canManage ? b.locationValue : null;
   const icsUrl = `/api/bookings/${encodeURIComponent(uid)}/ics${tokenValue ? `?token=${encodeURIComponent(tokenValue)}` : ""}`;
   // Without the manage token nobody learns who booked: show the event type, not the booking title.
-  const title = canManage ? b.title : `${eventType.title} with ${host.name}`;
+  const title = canManage ? b.title : t.titleWith(eventType.title, host.name);
   const calendarEvent = { title, start, end, details: (seat ? seat.notes : found.canManage ? b.notes : null) ?? undefined, location: location ?? undefined };
 
   return (
@@ -64,33 +69,33 @@ export default async function BookingPage({ params, searchParams }: PageProps<"/
           </span>
           <h1 className="text-xl font-semibold">
             {b.status === "rejected"
-              ? "This booking request was declined"
+              ? t.declined
               : cancelled
                 ? b.rescheduled
-                  ? "This booking was rescheduled"
-                  : "This booking is cancelled"
+                  ? t.rescheduled
+                  : t.cancelled
                 : pending
-                  ? "Waiting for the host to confirm"
+                  ? t.waiting
                   : isNew
-                    ? "You are scheduled"
-                    : "Your booking"}
+                    ? t.scheduled
+                    : t.yourBooking}
           </h1>
         </div>
-        {isNew && !cancelled && !pending && <p className="text-sm text-muted-foreground">A calendar invitation is on its way to your email.</p>}
-        {pending && <p className="text-sm text-muted-foreground">{host.name} needs to accept this request. You’ll get an email with the calendar invitation once they do.</p>}
-        {series.length > 1 && <p className="text-sm text-muted-foreground">Part of a recurring booking: {series.length} upcoming occurrences.</p>}
+        {isNew && !cancelled && !pending && <p className="text-sm text-muted-foreground">{t.invitationSent}</p>}
+        {pending && <p className="text-sm text-muted-foreground">{t.pendingNote(host.name)}</p>}
+        {series.length > 1 && <p className="text-sm text-muted-foreground">{t.seriesNote(series.length)}</p>}
         <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
-          <dt className="text-muted-foreground">What</dt>
+          <dt className="text-muted-foreground">{t.what}</dt>
           <dd className="font-medium">{title}</dd>
-          <dt className="text-muted-foreground">When</dt>
+          <dt className="text-muted-foreground">{t.when}</dt>
           <dd className={cancelled ? "line-through" : ""}>
             <LocalTime start={start} end={end} />
           </dd>
-          <dt className="text-muted-foreground">{found.hosts.length > 1 ? "Hosts" : "Host"}</dt>
+          <dt className="text-muted-foreground">{found.hosts.length > 1 ? t.hosts : t.host}</dt>
           <dd>{found.hosts.map((h) => h.name).join(", ")}</dd>
           {canManage && (
             <>
-              <dt className="text-muted-foreground">Invitees</dt>
+              <dt className="text-muted-foreground">{t.invitees}</dt>
               <dd>
                 <ul>
                   {attendees.map((a) => (
@@ -104,15 +109,15 @@ export default async function BookingPage({ params, searchParams }: PageProps<"/
           )}
           {canManage && b.locationKind && (
             <>
-              <dt className="text-muted-foreground">Where</dt>
+              <dt className="text-muted-foreground">{t.where}</dt>
               <dd className="break-all">
-                <LocationDetails kind={b.locationKind} value={location} />
+                <LocationDetails kind={b.locationKind} value={location} t={t} />
               </dd>
             </>
           )}
           {canManage && (b.cancellationReason || b.rejectionReason) && cancelled && (
             <>
-              <dt className="text-muted-foreground">Reason</dt>
+              <dt className="text-muted-foreground">{t.reason}</dt>
               <dd>{b.rejectionReason ?? b.cancellationReason}</dd>
             </>
           )}
@@ -123,7 +128,7 @@ export default async function BookingPage({ params, searchParams }: PageProps<"/
           <Separator />
           <div className="flex flex-col gap-2">
             <p className="flex items-center gap-2 text-sm font-medium">
-              <CalendarPlus className="size-4" aria-hidden /> Add to calendar
+              <CalendarPlus className="size-4" aria-hidden /> {t.addToCalendar}
             </p>
             <div className="flex flex-wrap gap-2">
               <Button asChild variant="outline">
@@ -152,24 +157,24 @@ export default async function BookingPage({ params, searchParams }: PageProps<"/
           <div className="flex flex-wrap items-start gap-2">
             {selfReschedule && bookingPath && (
               <Button asChild>
-                <Link href={`${bookingPath}?reschedule=${encodeURIComponent(uid)}&token=${encodeURIComponent(tokenValue)}`}>Reschedule</Link>
+                <Link href={`${bookingPath}?reschedule=${encodeURIComponent(uid)}&token=${encodeURIComponent(tokenValue)}`}>{t.reschedule}</Link>
               </Button>
             )}
-            <CancelBookingForm uid={uid} token={tokenValue} label={seat ? "Cancel my seat" : pending ? "Withdraw request" : "Cancel booking"} series={series.length > 1} />
+            <CancelBookingForm uid={uid} token={tokenValue} label={seat ? t.cancelSeat : pending ? t.withdraw : t.cancel} series={series.length > 1} />
           </div>
           </>
         ) : (
           <>
           <Separator />
-          <p className="text-sm text-muted-foreground">This booking can’t be changed online anymore. Please contact {host.name} directly.</p>
+          <p className="text-sm text-muted-foreground">{t.cannotChange(host.name)}</p>
           </>
         ))}
         {cancelled && bookingPath && (
           <Alert>
             <AlertDescription>
-              Need a new time?{" "}
+              {t.needNewTime}{" "}
               <Link className="font-medium" href={bookingPath}>
-                Book again
+                {t.bookAgain}
               </Link>
             </AlertDescription>
           </Alert>
@@ -180,10 +185,11 @@ export default async function BookingPage({ params, searchParams }: PageProps<"/
   );
 }
 
-const VIDEO_NAMES: Record<string, string> = { google_meet: "Google Meet", ms_teams: "Microsoft Teams", zoom: "Zoom", jitsi: "Jitsi Meet", link: "Meeting link" };
+const videoNames = (t: GuestText["confirmation"]): Record<string, string> => ({ google_meet: "Google Meet", ms_teams: "Microsoft Teams", zoom: "Zoom", jitsi: "Jitsi Meet", link: t.meetingLink });
 
 /** Location details for participants (INT-010/011). */
-function LocationDetails({ kind, value }: { kind: string; value: string | null }) {
+function LocationDetails({ kind, value, t }: { kind: string; value: string | null; t: GuestText["confirmation"] }) {
+  const VIDEO_NAMES = videoNames(t);
   const link = (url: string, label?: string) => (
     <a href={url} className="underline" rel="noopener noreferrer" target="_blank">
       {label ?? url}
@@ -191,10 +197,10 @@ function LocationDetails({ kind, value }: { kind: string; value: string | null }
   );
   if (kind in VIDEO_NAMES) {
     if (value && /^https?:\/\//.test(value)) return <>{VIDEO_NAMES[kind]}: {link(value)}</>;
-    return <>{VIDEO_NAMES[kind]} (the link will be in your confirmation email)</>;
+    return <>{VIDEO_NAMES[kind]} {t.linkInEmail}</>;
   }
-  if (kind === "in_person" && value) return <>{value} · {link(mapLink(value), "Open map")}</>;
-  if ((kind === "phone_host" || kind === "phone") && value) return <>Call {link(`tel:${value}`, value)}</>;
-  if (kind === "phone_attendee" && value) return <>The host will call you at {value}</>;
+  if (kind === "in_person" && value) return <>{value} · {link(mapLink(value), t.openMap)}</>;
+  if ((kind === "phone_host" || kind === "phone") && value) return <>{t.call} {link(`tel:${value}`, value)}</>;
+  if (kind === "phone_attendee" && value) return <>{t.hostWillCall(value)}</>;
   return <>{value}</>;
 }

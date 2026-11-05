@@ -10,6 +10,7 @@ import { clientIp, overLimit } from "@/lib/security/public-limits";
 import { externalBusyFor } from "@/features/calendars/server/runtime";
 import { cipherFromEnv } from "@/lib/crypto/encryption";
 import { getEnv } from "@/lib/env";
+import { localizeFieldErrors, publicMessages } from "./public-messages";
 import { enqueue } from "@/lib/jobs/enqueue";
 import { sealEmail } from "@/lib/jobs/queues";
 import { verifyCaptcha } from "@/lib/security/captcha";
@@ -30,24 +31,12 @@ import { resolveBookingTarget, type TargetKey } from "./targets";
 
 export type PublicResult<T = undefined> =
   | ({ ok: true } & (T extends undefined ? object : { data: T }))
-  | { ok: false; message: string; fieldErrors?: Record<string, string> };
+  | { ok: false; message: string; fieldErrors?: Record<string, string>; code?: string };
 
-const TOO_MANY = { ok: false as const, message: "Too many requests. Please wait a minute and try again." };
+/** Messages in the guest language (GUEST_LANGUAGE). */
+const msg = () => publicMessages(getEnv().GUEST_LANGUAGE);
+const tooMany = () => ({ ok: false as const, message: msg().tooMany });
 
-const FAILURE_MESSAGES: Record<string, string> = {
-  SLOT_UNAVAILABLE: "Sorry, that time was just taken. Please pick another one.",
-  INVALID_DURATION: "That duration isn't available for this event.",
-  TOO_MANY_GUESTS: "Too many guests for this event.",
-  DUPLICATE: "This booking was already submitted. Check your email for the confirmation.",
-  NO_SCHEDULE: "This host hasn't set up their availability yet.",
-  RESCHEDULE_NOT_ALLOWED: "This booking can no longer be rescheduled.",
-  NOT_FOUND: "We couldn't find this booking.",
-  ALREADY_CANCELLED: "This booking is already cancelled.",
-  IN_PAST: "This meeting has already taken place.",
-  LINK_INVALID: "This booking link is invalid, expired or has already been used.",
-  NOT_ALLOWED: "The host doesn't allow changing this booking online anymore. Please contact them directly.",
-  INVALID_RECURRENCE: "That number of occurrences isn't available for this event.",
-};
 
 async function resolve(key: TargetKey) {
   const db = getDb();
@@ -66,15 +55,15 @@ async function routingResponseFor(db: ReturnType<typeof getDb>, id: string | und
 }
 
 export async function holdSlotAction(raw: unknown): Promise<PublicResult> {
-  if (await overLimit("hold", clientIp(await headers()))) return TOO_MANY;
+  if (await overLimit("hold", clientIp(await headers()))) return tooMany();
   const parsed = holdSchema.safeParse(raw);
-  if (!parsed.success) return { ok: false, message: "Invalid request." };
+  if (!parsed.success) return { ok: false, message: msg().invalidRequest };
   const target = await resolve(parsed.data);
-  if (!target) return { ok: false, message: FAILURE_MESSAGES.NOT_FOUND };
+  if (!target) return { ok: false, message: msg().failures.NOT_FOUND };
   // Holds are per host; a team slot's host is only known at booking time, so none is taken.
   if (target.target.hosts) return { ok: true };
   if (target.eventType.linkOnly && !(await isUsablePrivateLink(target.db, target.eventType.id, parsed.data.link, Date.now()))) {
-    return { ok: false, message: FAILURE_MESSAGES.LINK_INVALID };
+    return { ok: false, message: msg().failures.LINK_INVALID };
   }
   try {
     await holdSlot(target.db, {
@@ -87,7 +76,7 @@ export async function holdSlotAction(raw: unknown): Promise<PublicResult> {
       externalBusy: externalBusyFor(target.host, target.eventType.id),
     });
   } catch (error) {
-    if (error instanceof BookingFailure) return { ok: false, message: FAILURE_MESSAGES[error.code] ?? "Unavailable." };
+    if (error instanceof BookingFailure) return { ok: false, message: msg().failures[error.code] ?? msg().unavailable, code: error.code };
     throw error;
   }
   return { ok: true };
@@ -100,28 +89,28 @@ function validateAnswers(questions: Parameters<typeof answersSchema>[0], raw: un
   const parsed = answersSchema(questions).safeParse(raw);
   if (parsed.success) return { ok: true, answers: parsed.data };
   const errors = Object.fromEntries(parsed.error.issues.map((i) => [`answers.${String(i.path[0])}`, i.message]));
-  return { ok: false, result: { ok: false, message: "Please check the form.", fieldErrors: errors } };
+  return { ok: false, result: { ok: false, message: msg().checkForm, fieldErrors: localizeFieldErrors(errors, getEnv().GUEST_LANGUAGE) } };
 }
 
 export async function createBookingAction(raw: CreateBookingPayload): Promise<CreateResult> {
   const parsed = createBookingSchema.safeParse(raw);
-  if (!parsed.success) return { ok: false, message: "Please check the form.", fieldErrors: fieldErrors(parsed.error) };
+  if (!parsed.success) return { ok: false, message: msg().checkForm, fieldErrors: localizeFieldErrors(fieldErrors(parsed.error), getEnv().GUEST_LANGUAGE) };
   const input = parsed.data;
   if ((await overLimit("book", clientIp(await headers()))) || (await overLimit("bookPerEmail", input.booker.email))) {
-    return TOO_MANY;
+    return tooMany();
   }
 
   const env = getEnv();
   if (env.CAPTCHA === "altcha" && !(await verifyCaptcha(getDb(), env.AUTH_SECRET, input.captcha))) {
-    return { ok: false, message: "We couldn't verify this request. Please try again." };
+    return { ok: false, message: msg().captchaFailed };
   }
   // Guests get emails too: each address has its own "as guest" limit, so the form can't be used to
   // mail-bomb someone — and listing someone as a guest never uses up their own booking quota.
   for (const guest of new Set(input.guests.map((g) => g.toLowerCase()))) {
-    if (await overLimit("bookAsGuest", guest)) return TOO_MANY;
+    if (await overLimit("bookAsGuest", guest)) return tooMany();
   }
   const target = await resolve(input);
-  if (!target) return { ok: false, message: "This booking page is not available." };
+  if (!target) return { ok: false, message: msg().pageUnavailable };
   const teamHosts = target.target.hosts;
   const answers = validateAnswers(target.eventType.questions, input.responses);
   if (!answers.ok) return answers.result;
@@ -135,8 +124,8 @@ export async function createBookingAction(raw: CreateBookingPayload): Promise<Cr
   } catch (error) {
     if (error instanceof LocationChoiceError) {
       return error.field === "phone"
-        ? { ok: false, message: "Please check the form.", fieldErrors: { phone: "Enter your phone number" } }
-        : { ok: false, message: "Please choose a location." };
+        ? { ok: false, message: msg().checkForm, fieldErrors: { phone: msg().phoneRequired } }
+        : { ok: false, message: msg().chooseLocation };
     }
     throw error;
   }
@@ -217,15 +206,15 @@ export async function createBookingAction(raw: CreateBookingPayload): Promise<Cr
       data: { redirect: `/booking/${b.uid}?token=${encodeURIComponent(created.token)}&new=1${input.embed ? "&embed=1" : ""}`, uid: b.uid, status: b.status },
     };
   } catch (error) {
-    if (error instanceof BookingFailure) return { ok: false, message: FAILURE_MESSAGES[error.code] ?? "Booking failed." };
+    if (error instanceof BookingFailure) return { ok: false, message: msg().failures[error.code] ?? msg().bookingFailed, code: error.code };
     throw error;
   }
 }
 
 export async function cancelBookingAction(raw: unknown): Promise<PublicResult> {
-  if (await overLimit("cancel", clientIp(await headers()))) return TOO_MANY;
+  if (await overLimit("cancel", clientIp(await headers()))) return tooMany();
   const parsed = cancelBookingSchema.safeParse(raw);
-  if (!parsed.success) return { ok: false, message: "Invalid request." };
+  if (!parsed.success) return { ok: false, message: msg().invalidRequest };
   const { scope, ...input } = parsed.data;
   const onCommit = (tx: Tx, cancelled: { id: string }) =>
     enqueue("bookingProcess", { bookingId: cancelled.id, event: "cancelled" }, { db: fromDrizzle(tx, sql) }).then(() => undefined);
@@ -258,7 +247,7 @@ export async function cancelBookingAction(raw: unknown): Promise<PublicResult> {
     else await cancelByAttendee(db, { ...input, now: Date.now(), onCommit });
     return { ok: true };
   } catch (error) {
-    if (error instanceof BookingFailure) return { ok: false, message: FAILURE_MESSAGES[error.code] ?? "Cancellation failed." };
+    if (error instanceof BookingFailure) return { ok: false, message: msg().failures[error.code] ?? msg().cancellationFailed, code: error.code };
     throw error;
   }
 }

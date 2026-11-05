@@ -10,22 +10,26 @@ import { Input } from "@/components/ui/input";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Spinner } from "@/components/ui/spinner";
 import { formatDateTimeRange, prefers12Hour } from "@/lib/format";
+import { pickBookerLocale } from "./booker-view";
 import { cancelBookingAction } from "../server/public-actions";
+import { useGuestText } from "@/features/i18n/guest-text";
 
 /** Booking time shown in the viewer's own zone and clock (BKG-007). */
 export function LocalTime({ start, end }: { start: number; end: number }) {
   const [label, setLabel] = useState<string | null>(null);
+  const { lang } = useGuestText();
   useEffect(() => {
-    const locale = navigator.language || "en-US";
+    const locale = pickBookerLocale(lang, navigator.language || "en-US");
     const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
     // eslint-disable-next-line react-hooks/set-state-in-effect -- browser-only formatting
     setLabel(`${formatDateTimeRange(start, end, { locale, timeZone, hour12: prefers12Hour(locale) })} (${timeZone.replaceAll("_", " ")})`);
-  }, [start, end]);
+  }, [start, end, lang]);
   return <span suppressHydrationWarning>{label ?? new Date(start).toISOString().replace("T", " ").slice(0, 16) + " UTC"}</span>;
 }
 
-export function CancelBookingForm({ uid, token, label = "Cancel booking", series = false }: { uid: string; token: string; label?: string; series?: boolean }) {
+export function CancelBookingForm({ uid, token, label, series = false }: { uid: string; token: string; label?: string; series?: boolean }) {
   const router = useRouter();
+  const { t } = useGuestText();
   const [open, setOpen] = useState(false);
   const [scope, setScope] = useState<"booking" | "series">("booking");
   const [pending, setPending] = useState(false);
@@ -34,7 +38,7 @@ export function CancelBookingForm({ uid, token, label = "Cancel booking", series
   if (!open) {
     return (
       <Button type="button" variant="outline" onClick={() => setOpen(true)}>
-        {label}
+        {label ?? t.confirmation.cancel}
       </Button>
     );
   }
@@ -57,25 +61,25 @@ export function CancelBookingForm({ uid, token, label = "Cancel booking", series
       {series && (
         <FieldSet className="gap-1.5">
           <FieldLegend variant="label" className="mb-1">
-            What do you want to cancel?
+            {t.manage.whatToCancel}
           </FieldLegend>
           <RadioGroup name="scope" value={scope} onValueChange={(v) => setScope(v === "series" ? "series" : "booking")}>
             <Field orientation="horizontal">
               <RadioGroupItem id="scope-booking" value="booking" />
               <FieldLabel htmlFor="scope-booking" className="font-normal">
-                Only this occurrence
+                {t.manage.onlyThis}
               </FieldLabel>
             </Field>
             <Field orientation="horizontal">
               <RadioGroupItem id="scope-series" value="series" />
               <FieldLabel htmlFor="scope-series" className="font-normal">
-                This and all remaining occurrences
+                {t.manage.thisAndRemaining}
               </FieldLabel>
             </Field>
           </RadioGroup>
         </FieldSet>
       )}
-      <FormField label="Reason for cancelling (optional)" htmlFor="reason">
+      <FormField label={t.manage.reason} htmlFor="reason">
         <Input id="reason" name="reason" maxLength={500} />
       </FormField>
       {error && (
@@ -86,10 +90,10 @@ export function CancelBookingForm({ uid, token, label = "Cancel booking", series
       <div className="flex gap-2">
         <Button type="submit" variant="destructive" disabled={pending}>
           {pending && <Spinner />}
-          {pending ? "Cancelling…" : "Confirm cancellation"}
+          {pending ? t.manage.cancelling : t.manage.confirmCancel}
         </Button>
         <Button type="button" variant="ghost" onClick={() => setOpen(false)}>
-          Keep booking
+          {t.manage.keep}
         </Button>
       </div>
     </form>
