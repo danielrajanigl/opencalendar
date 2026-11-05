@@ -7,6 +7,7 @@ import { cn } from "@/lib/cn";
 import { type FormatPrefs, formatDateLong, formatDuration, formatTime } from "@/lib/format";
 import { Markdown } from "@/lib/markdown";
 import type { BookingFormConfig } from "./booking-form";
+import { useGuestText } from "@/features/i18n/guest-text";
 
 type Props = {
   title: string;
@@ -28,6 +29,7 @@ type Props = {
 /** The event details column of the booking page (BKG-002). */
 export function BookingDetails(props: Props) {
   const { form, prefs, duration, ready } = props;
+  const { t } = useGuestText();
   return (
     <aside
       className={cn(
@@ -42,7 +44,7 @@ export function BookingDetails(props: Props) {
       {ready && form.reschedule && (
         <Alert>
           <AlertDescription>
-            Rescheduling your booking from {formatDateLong(form.reschedule.previousStart, prefs)}, {formatTime(form.reschedule.previousStart, prefs)}.
+            {t.booking.rescheduling(formatDateLong(form.reschedule.previousStart, prefs), formatTime(form.reschedule.previousStart, prefs))}
           </AlertDescription>
         </Alert>
       )}
@@ -51,12 +53,12 @@ export function BookingDetails(props: Props) {
       </p>
       {ready && form.recurring && (
         <p className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Repeat className="size-4" aria-hidden /> Can repeat {form.recurring.frequency === "weekly" ? "weekly" : "monthly"}, up to {form.recurring.maxCount} times
+          <Repeat className="size-4" aria-hidden /> {t.booking.canRepeat(form.recurring.frequency === "weekly" ? "weekly" : "monthly", form.recurring.maxCount)}
         </p>
       )}
       {ready && props.seated && (
         <p className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Users className="size-4" aria-hidden /> Group event
+          <Users className="size-4" aria-hidden /> {t.booking.groupEvent}
         </p>
       )}
       {ready &&
@@ -68,7 +70,7 @@ export function BookingDetails(props: Props) {
       {props.description && <Markdown source={props.description} className="text-sm" />}
       {ready && props.durations.length > 1 && (
         <fieldset>
-          <legend className="mb-1 text-sm font-medium">Duration</legend>
+          <legend className="mb-1 text-sm font-medium">{t.booking.duration}</legend>
           <div className="flex flex-wrap gap-2">
             {props.durations.map((d) => (
               <Button key={d} type="button" variant={d === duration ? "default" : "outline"} aria-pressed={d === duration} onClick={() => props.onDuration(d)}>

@@ -1,5 +1,6 @@
 import type { BookingLayout } from "@/features/embed/target";
 import { addDays, compareDates, formatDate, type LocalDate, wallToUtc, weekdayOf } from "@/lib/availability/tz";
+import { guestLocale, type GuestLanguage } from "@/lib/i18n/guest";
 
 /** Pure calendar math for the booking widget's layouts (month, week, column). */
 
@@ -7,6 +8,9 @@ export type Slot = { start: number; end: number; seats?: number };
 export type Month = { year: number; month: number };
 /** A half-open range of local days [from, to). */
 export type DayRange = { from: LocalDate; to: LocalDate };
+
+/** Locale for the booker's dates and clock: German pages always use German, English pages follow the browser. */
+export const pickBookerLocale = (lang: GuestLanguage, browserLocale: string): string => (lang === "en" ? browserLocale : guestLocale(lang));
 
 /** Week layout default when the host's week start isn't known. */
 export const DEFAULT_WEEK_START = 1;

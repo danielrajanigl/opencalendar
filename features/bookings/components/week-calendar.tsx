@@ -10,6 +10,7 @@ import { cn } from "@/lib/cn";
 import { type FormatPrefs, formatDateLong } from "@/lib/format";
 import { type Slot, weekDays } from "./booker-view";
 import { SlotButton } from "./slot-button";
+import { useGuestText } from "@/features/i18n/guest-text";
 
 type Props = {
   /** First day of the visible week. */
@@ -36,6 +37,7 @@ const noon = (d: LocalDate) => wallToUtc(d, 12 * 60, "UTC");
  */
 export function WeekCalendar(props: Props) {
   const { prefs, byDate, week } = props;
+  const { t } = useGuestText();
   const utc = { ...prefs, timeZone: "UTC" };
   const days = weekDays(week);
   const rangeLabel = new Intl.DateTimeFormat(prefs.locale, { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }).formatRange(noon(days[0]), noon(days[6]));
@@ -44,22 +46,22 @@ export function WeekCalendar(props: Props) {
   const empty = days.every((d) => !byDate.get(formatDate(d))?.length);
 
   return (
-    <section aria-label="Choose a date and time" aria-busy={props.busy} data-layout="week">
+    <section aria-label={t.calendar.chooseDateTime} aria-busy={props.busy} data-layout="week">
       <div className="mb-4 flex items-center justify-between">
         <h2 className="font-medium" aria-live="polite">
           {rangeLabel}
         </h2>
         <div className="flex gap-1">
-          <Button type="button" variant="ghost" size="icon" aria-label="Previous week" disabled={!canGoBack} onClick={() => props.onChangeWeek(-1)}>
+          <Button type="button" variant="ghost" size="icon" aria-label={t.calendar.previousWeek} disabled={!canGoBack} onClick={() => props.onChangeWeek(-1)}>
             <ChevronLeft className="size-4" aria-hidden />
           </Button>
-          <Button type="button" variant="ghost" size="icon" aria-label="Next week" onClick={() => props.onChangeWeek(1)}>
+          <Button type="button" variant="ghost" size="icon" aria-label={t.calendar.nextWeek} onClick={() => props.onChangeWeek(1)}>
             <ChevronRight className="size-4" aria-hidden />
           </Button>
         </div>
       </div>
       <div className="overflow-x-auto">
-        <div className="grid min-w-[560px] grid-cols-7 gap-2" role="group" aria-label="Week">
+        <div className="grid min-w-[560px] grid-cols-7 gap-2" role="group" aria-label={t.calendar.week}>
           {days.map((d) => {
             const key = formatDate(d);
             const slots = byDate.get(key) ?? [];
@@ -89,7 +91,7 @@ export function WeekCalendar(props: Props) {
                 ) : (
                   <p className="text-center text-sm text-muted-foreground">
                     <span aria-hidden>—</span>
-                    <span className="sr-only">No times available</span>
+                    <span className="sr-only">{t.calendar.noTimes}</span>
                   </p>
                 )}
               </div>
@@ -107,7 +109,7 @@ export function WeekCalendar(props: Props) {
           <AlertDescription>{props.loadError}</AlertDescription>
         </Alert>
       )}
-      {!props.loading && !props.loadError && empty && <p className="mt-3 text-sm text-muted-foreground">No times available this week. Try the next week.</p>}
+      {!props.loading && !props.loadError && empty && <p className="mt-3 text-sm text-muted-foreground">{t.calendar.noTimesWeek}</p>}
       {props.preferences}
     </section>
   );

@@ -86,7 +86,7 @@ export async function BookingPageView({ target, query }: { target: BookingTarget
             ...(target.team && { team: target.team.slug }),
             slug: eventType.slug,
             ...(routing && /^[A-Za-z0-9_-]{1,64}$/.test(routing) && { routing }),
-            locations: eventType.locations.map((l) => ({ kind: l.kind, label: publicLocationLabel(l) })),
+            locations: eventType.locations.map((l) => ({ kind: l.kind, label: publicLocationLabel(l, getEnv().GUEST_LANGUAGE) })),
             maxGuests: eventType.seatsPerSlot ? 0 : eventType.maxGuests,
             questions: eventType.questions,
             recurring: eventType.recurringFrequency && eventType.recurringMaxCount ? { frequency: eventType.recurringFrequency, maxCount: eventType.recurringMaxCount } : null,

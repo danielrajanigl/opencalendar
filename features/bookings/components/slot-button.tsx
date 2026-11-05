@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
 import { type FormatPrefs, formatTime } from "@/lib/format";
 import type { Slot } from "./booker-view";
+import { useGuestText } from "@/features/i18n/guest-text";
 
 type Props = {
   slot: Slot;
@@ -16,7 +17,8 @@ type Props = {
 
 /** One bookable time, named by its start time (E2E and screen readers rely on the name). */
 export function SlotButton({ slot, prefs, seated, compact, className, onChoose }: Props) {
-  const seats = seated && slot.seats !== undefined ? `${slot.seats} ${slot.seats === 1 ? "seat" : "seats"} left` : null;
+  const { t } = useGuestText();
+  const seats = seated && slot.seats !== undefined ? t.calendar.seatsLeft(slot.seats) : null;
   return (
     <Button type="button" variant="outline" size={compact ? "sm" : "default"} className={cn(compact && "h-auto flex-col gap-0 px-1 py-1.5", className)} onClick={() => onChoose(slot)}>
       {formatTime(slot.start, prefs)}

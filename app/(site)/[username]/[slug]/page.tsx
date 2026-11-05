@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getDb } from "@/db/client";
+import { getEnv } from "@/lib/env";
+import { guestText } from "@/lib/i18n/guest";
 import { BookingPageView } from "@/features/bookings/components/booking-page";
 import { resolveBookingTarget, safeDecode } from "@/features/bookings/server/targets";
 
@@ -12,7 +14,7 @@ async function load(params: PageProps<"/[username]/[slug]">["params"]) {
 export async function generateMetadata({ params }: PageProps<"/[username]/[slug]">): Promise<Metadata> {
   const target = await load(params);
   // Reschedule and private links carry tokens in the URL: no referrer.
-  return { title: target ? `${target.eventType.title} · ${target.displayName}` : "Not found", referrer: "no-referrer" };
+  return { title: target ? `${target.eventType.title} · ${target.displayName}` : guestText(getEnv().GUEST_LANGUAGE).booking.notFound, referrer: "no-referrer" };
 }
 
 /** Personal booking page, or a dynamic group's (`/ada+bob/intro`, TEAM-009). */

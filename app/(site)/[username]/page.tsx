@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getDb } from "@/db/client";
+import { getEnv } from "@/lib/env";
+import { guestText } from "@/lib/i18n/guest";
 import { EventTypeList } from "@/features/bookings/components/event-type-list";
 import { groupUsernames, resolveBookingTarget, safeDecode } from "@/features/bookings/server/targets";
 import { findPublicHost, listPublicEventTypes } from "@/features/event-types/server/service";
@@ -27,7 +29,7 @@ async function load(raw: string): Promise<Loaded | null> {
 
 export async function generateMetadata({ params }: PageProps<"/[username]">): Promise<Metadata> {
   const found = await load((await params).username);
-  return { title: found ? found.heading : "Not found" };
+  return { title: found ? found.heading : guestText(getEnv().GUEST_LANGUAGE).booking.notFound };
 }
 
 export default async function ProfilePage({ params }: PageProps<"/[username]">) {

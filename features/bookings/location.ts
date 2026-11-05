@@ -1,12 +1,14 @@
 import { randomToken } from "@/lib/ids";
-import { LOCATION_LABELS, type LocationKind } from "@/features/event-types/schemas";
+import type { LocationKind } from "@/features/event-types/schemas";
 import type { EventTypeLocationView } from "@/features/event-types/server/service";
+import { guestText, type GuestLanguage } from "@/lib/i18n/guest";
 import type { ChosenLocation } from "./server/service";
 
 /** What the booking page shows for a location before booking (details only after booking). */
-export function publicLocationLabel(loc: EventTypeLocationView): string {
-  if (loc.kind === "in_person" && loc.value) return `In person: ${loc.value}`;
-  return LOCATION_LABELS[loc.kind];
+export function publicLocationLabel(loc: EventTypeLocationView, lang: GuestLanguage = "en"): string {
+  const t = guestText(lang).location;
+  if (loc.kind === "in_person" && loc.value) return t.inPersonAt(loc.value);
+  return t.kinds[loc.kind];
 }
 
 export class LocationChoiceError extends Error {

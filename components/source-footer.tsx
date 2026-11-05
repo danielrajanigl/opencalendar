@@ -3,6 +3,7 @@ import { getDb } from "@/db/client";
 import { footerParts } from "@/features/instance/footer";
 import { getInstanceSettings } from "@/features/instance/server/service";
 import { getEnv } from "@/lib/env";
+import { guestText } from "@/lib/i18n/guest";
 
 /**
  * AGPL-3.0 §13: everyone using the service over the network is offered the source code. The link
@@ -14,16 +15,17 @@ export async function SourceFooter() {
   const parts = footerParts(await getInstanceSettings(getDb()));
   if (!parts) return null;
   const linkClass = "underline underline-offset-4";
+  const t = guestText(getEnv().GUEST_LANGUAGE).footer;
   return (
     <footer className="px-4 py-3 text-center text-xs text-muted-foreground">
-      {parts.poweredBy && <>Powered by OpenCalendar · </>}
+      {parts.poweredBy && <>{t.poweredBy}</>}
       {parts.source === "link" ? (
         <a href={getEnv().SOURCE_URL} className={linkClass} rel="noopener">
-          Source code (AGPL-3.0)
+          {t.source}
         </a>
       ) : (
         <Link href="/about" className={linkClass}>
-          About
+          {t.about}
         </Link>
       )}
     </footer>

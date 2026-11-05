@@ -11,6 +11,7 @@ import { type FormatPrefs, formatDateLong } from "@/lib/format";
 import { type Month, monthDays, type Slot } from "./booker-view";
 import { revealBehavior, shouldReveal } from "./reveal";
 import { SlotButton } from "./slot-button";
+import { useGuestText } from "@/features/i18n/guest-text";
 
 type Props = {
   month: Month;
@@ -41,6 +42,7 @@ type Props = {
  */
 export function MonthCalendar(props: Props) {
   const { month, prefs, byDate, selectedDate, today } = props;
+  const { t } = useGuestText();
   const locale = prefs.locale;
   const days = monthDays(month);
   const leading = (weekdayOf(days[0]) - props.weekStart + 7) % 7;
@@ -64,16 +66,16 @@ export function MonthCalendar(props: Props) {
   return (
     // Side by side once the panel (not the window) is wide enough; see BookingWidget.
     <div className={cn("grid gap-4 @xl/panel:gap-6", !props.stacked && "@xl/panel:grid-cols-[1fr_220px]")}>
-      <section aria-label="Choose a date" aria-busy={props.busy}>
+      <section aria-label={t.calendar.chooseDate} aria-busy={props.busy}>
         <div className="mb-2 flex items-center justify-between @xl/panel:mb-4">
           <h2 className="font-medium" aria-live="polite">
             {monthLabel}
           </h2>
           <div className="flex gap-1">
-            <Button type="button" variant="ghost" size="icon" aria-label="Previous month" disabled={!canGoBack} onClick={() => props.onChangeMonth(-1)}>
+            <Button type="button" variant="ghost" size="icon" aria-label={t.calendar.previousMonth} disabled={!canGoBack} onClick={() => props.onChangeMonth(-1)}>
               <ChevronLeft className="size-4" aria-hidden />
             </Button>
-            <Button type="button" variant="ghost" size="icon" aria-label="Next month" onClick={() => props.onChangeMonth(1)}>
+            <Button type="button" variant="ghost" size="icon" aria-label={t.calendar.nextMonth} onClick={() => props.onChangeMonth(1)}>
               <ChevronRight className="size-4" aria-hidden />
             </Button>
           </div>
@@ -83,7 +85,7 @@ export function MonthCalendar(props: Props) {
             <div key={w}>{w}</div>
           ))}
         </div>
-        <div className="mt-1 grid grid-cols-7 gap-1" role="group" aria-label="Days">
+        <div className="mt-1 grid grid-cols-7 gap-1" role="group" aria-label={t.calendar.days}>
           {Array.from({ length: leading }, (_, i) => (
             <div key={`pad-${i}`} />
           ))}
@@ -99,7 +101,7 @@ export function MonthCalendar(props: Props) {
                 variant={selected ? "default" : available ? "secondary" : "ghost"}
                 disabled={!available}
                 aria-pressed={selected}
-                aria-label={`${label}${available ? "" : ", no times available"}`}
+                aria-label={`${label}${available ? "" : t.calendar.noTimesSuffix}`}
                 onClick={() => {
                   revealPending.current = true;
                   props.onSelectDate(key);
@@ -128,11 +130,11 @@ export function MonthCalendar(props: Props) {
           </Alert>
         )}
         {!props.loading && !props.loadError && props.empty && (
-          <p className="mt-3 text-sm text-muted-foreground">No times available this month. Try the next month.</p>
+          <p className="mt-3 text-sm text-muted-foreground">{t.calendar.noTimesMonth}</p>
         )}
         {props.preferences}
       </section>
-      <section ref={timesRef} aria-label="Choose a time" className="scroll-mt-4">
+      <section ref={timesRef} aria-label={t.calendar.chooseTime} className="scroll-mt-4">
         {selectedDate ? (
           <>
             <h2 className="mb-3 text-sm font-medium">{formatDateLong(byDate.get(selectedDate)?.[0]?.start ?? props.nowMs, prefs)}</h2>
@@ -152,7 +154,7 @@ export function MonthCalendar(props: Props) {
             </ul>
           </>
         ) : (
-          <p className="text-sm text-muted-foreground">Select a date to see available times.</p>
+          <p className="text-sm text-muted-foreground">{t.calendar.selectDate}</p>
         )}
       </section>
     </div>

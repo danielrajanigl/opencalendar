@@ -21,6 +21,7 @@ import {
   monthOf,
   monthRange,
   normalizeWeekStart,
+  pickBookerLocale,
   rangeKey,
   rangeWindow,
   type Slot,
@@ -32,6 +33,7 @@ import {
 import { BookingDetails } from "./booking-details";
 import { BookingForm, type BookingFormConfig } from "./booking-form";
 import { LayoutSwitcher, useNarrowScreen } from "./layout-switcher";
+import { useGuestText } from "@/features/i18n/guest-text";
 import { MonthCalendar } from "./month-calendar";
 import { WeekCalendar } from "./week-calendar";
 
@@ -84,6 +86,7 @@ function parseInitialDate(value: string | undefined): LocalDate | null {
 
 export function BookingWidget(props: BookingWidgetProps) {
   const { form } = props;
+  const { t, lang: guestLang } = useGuestText();
   const [ready, setReady] = useState(false);
   const [nowMs, setNowMs] = useState(0);
   const [locale, setLocale] = useState("en-US");
@@ -114,7 +117,7 @@ export function BookingWidget(props: BookingWidgetProps) {
 
   // Browser-only defaults (BKG-003): detected zone, locale clock convention.
   useEffect(() => {
-    const lang = navigator.language || "en-US";
+    const lang = pickBookerLocale(guestLang, navigator.language || "en-US");
     const tz = props.lockTimeZone ?? (Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC");
     holdToken.current = `${crypto.randomUUID()}${crypto.randomUUID()}`;
     idempotencyKey.current = crypto.randomUUID();
@@ -141,7 +144,7 @@ export function BookingWidget(props: BookingWidgetProps) {
     /* eslint-enable react-hooks/set-state-in-effect */
     emitEmbed("ready", {});
     return watchDimensions();
-  }, [props.lockTimeZone, props.initialDate, props.initialMonth, props.initialSlot, hostWeekStart]);
+  }, [props.lockTimeZone, props.initialDate, props.initialMonth, props.initialSlot, hostWeekStart, guestLang]);
 
   const prefs = useMemo(() => ({ locale, timeZone, hour12 }), [locale, timeZone, hour12]);
   const timeZones = useMemo(() => (ready ? Intl.supportedValuesOf("timeZone") : []), [ready]);
@@ -186,11 +189,11 @@ export function BookingWidget(props: BookingWidgetProps) {
       setSlots(data.slots);
       setLoadedKey(key);
     } catch {
-      if (seq === requestSeq.current) setLoadError("Couldn't load available times. Please try again.");
+      if (seq === requestSeq.current) setLoadError(t.booking.loadError);
     } finally {
       if (seq === requestSeq.current) setLoading(false);
     }
-  }, [range, timeZone, duration, form.username, form.team, form.slug, form.link, form.reschedule]);
+  }, [range, timeZone, duration, form.username, form.team, form.slug, form.link, form.reschedule, t.booking.loadError]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- fetching is the effect's purpose
@@ -266,7 +269,7 @@ export function BookingWidget(props: BookingWidgetProps) {
         <div className="grid gap-0 @3xl/booker:grid-cols-[260px_1fr]">
           {details}
           <div className="p-4 @lg/booker:p-6" aria-busy="true">
-            <span className="sr-only">Loading availability…</span>
+            <span className="sr-only">{t.booking.loading}</span>
             <div className="flex max-w-md flex-col gap-3" aria-hidden>
               <Skeleton className="h-6 w-40" />
               <div className="grid grid-cols-7 gap-1">
@@ -343,7 +346,7 @@ export function BookingWidget(props: BookingWidgetProps) {
               )}
               {slotNotice !== null && (
                 <Alert className="mb-4">
-                  <AlertDescription>That time is no longer available — pick another time on {formatWeekdayDate(slotNotice, prefs)}.</AlertDescription>
+                  <AlertDescription>{t.booking.slotGone(formatWeekdayDate(slotNotice, prefs))}</AlertDescription>
                 </Alert>
               )}
               {shown === "week" ? (

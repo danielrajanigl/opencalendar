@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { isValidTimeZone } from "@/lib/availability/tz";
 import { cn } from "@/lib/cn";
+import { useGuestText } from "@/features/i18n/guest-text";
 
 type Props = {
   lockTimeZone: string | null;
@@ -25,6 +26,7 @@ type Props = {
  */
 export function BookerPreferences(props: Props) {
   const { hour12 } = props;
+  const { t } = useGuestText();
   const [open, setOpen] = useState(false);
   const zone = (props.lockTimeZone ?? props.tzInput).replaceAll("_", " ");
   return (
@@ -40,17 +42,17 @@ export function BookerPreferences(props: Props) {
         <span className="min-w-0 flex-1 truncate">
           {zone} · {hour12 ? "12h" : "24h"}
         </span>
-        <span className="shrink-0 font-medium text-foreground">{open ? "Done" : "Change"}</span>
+        <span className="shrink-0 font-medium text-foreground">{open ? t.preferences.done : t.preferences.change}</span>
       </button>
       <div id="booker-preferences" className={cn("flex-wrap items-end gap-3 @xl/panel:flex", open ? "mt-2 flex" : "hidden")}>
         {props.lockTimeZone ? (
           <p className="flex items-center gap-1 text-sm">
-            <Globe className="size-4" aria-hidden /> Times in {props.lockTimeZone.replaceAll("_", " ")}
+            <Globe className="size-4" aria-hidden /> {t.preferences.timesIn(props.lockTimeZone.replaceAll("_", " "))}
           </p>
         ) : (
           <div className="flex w-full flex-col gap-1.5 @xl/panel:w-auto">
             <Label htmlFor="tz" className="gap-1">
-              <Globe className="size-4" aria-hidden /> Time zone
+              <Globe className="size-4" aria-hidden /> {t.preferences.timeZone}
             </Label>
             <Input
               id="tz"
@@ -69,7 +71,7 @@ export function BookerPreferences(props: Props) {
             </datalist>
           </div>
         )}
-        <div role="group" aria-label="Clock format" className="flex">
+        <div role="group" aria-label={t.preferences.clockFormat} className="flex">
           <Button type="button" variant={hour12 ? "default" : "outline"} aria-pressed={hour12} className="rounded-r-none" onClick={() => props.onHour12(true)}>
             12h
           </Button>
