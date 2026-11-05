@@ -8,6 +8,20 @@ image and restart"; migrations run automatically (see
 
 ## [Unreleased]
 
+## [1.3.1-rs.1] - 2026-11-05
+
+Fork for Buchhaltungsservice RS (https://github.com/danielrajanigl/opencalendar), based on 1.3.1.
+
+### Added
+- **Guest language** (`GUEST_LANGUAGE=en|de`, default `en`): booking pages, forms, confirmation
+  and manage pages, booking emails and the default reminder in German. The dashboard stays
+  English. English output is unchanged.
+
+### Changed
+- The booking form recognises a taken slot by the error code `SLOT_UNAVAILABLE` instead of the
+  English message text.
+- Release tags are accepted on the fork's `rs/deutsch` branch.
+
 ## [1.3.1] - 2026-11-04
 
 ### Fixed
