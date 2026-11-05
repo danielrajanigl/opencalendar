@@ -137,6 +137,18 @@ const schema = baseSchema.superRefine((env, ctx) => {
 
 type RawEnv = z.infer<typeof schema>;
 
+/**
+ * Guest language for code that also runs where the full environment may be absent (tests, tools):
+ * falls back to English instead of failing on unrelated missing variables.
+ */
+export function guestLanguage(): "en" | "de" {
+  try {
+    return getEnv().GUEST_LANGUAGE;
+  } catch {
+    return "en";
+  }
+}
+
 export type OAuthClient = { clientId: string; clientSecret: string };
 
 export type Env = RawEnv & {

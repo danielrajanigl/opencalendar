@@ -38,6 +38,7 @@ export async function registerWorkers(boss: PgBoss, deps: WorkerDeps): Promise<v
     createEmailSendHandler({
       ...deps,
       branding: async () => emailBranding(await getInstanceSettings(deps.db), deps.env.APP_URL),
+      language: deps.env.GUEST_LANGUAGE,
     }),
   );
   await boss.work(

@@ -3,6 +3,7 @@ import type { CSSProperties, ReactElement } from "react";
 import { DEFAULT_EMAIL_BRANDING, type EmailBranding } from "@/features/instance/email-branding";
 import type { CalendarPart } from "@/lib/email/transport";
 import { formatDateTimeRange, timeZoneLabel } from "@/lib/format";
+import { guestText, type GuestLanguage, type GuestText } from "@/lib/i18n/guest";
 import type { EmailContent } from "@/lib/jobs/queues";
 
 /**
@@ -32,9 +33,9 @@ const buttonStyle = (b: EmailBranding): CSSProperties => ({
   padding: "10px 18px",
 });
 
-function Layout(props: { branding: EmailBranding; preview: string; heading: string; footer?: string; children: React.ReactNode }) {
+function Layout(props: { branding: EmailBranding; preview: string; heading: string; footer?: string; lang?: GuestLanguage; children: React.ReactNode }) {
   return (
-    <Html lang="en">
+    <Html lang={props.lang ?? "en"}>
       <Head />
       <Preview>{props.preview}</Preview>
       <Body style={styles.body}>
@@ -65,11 +66,11 @@ function ActionEmail(props: { branding: EmailBranding; preview: string; heading:
 
 type BookingProps = Extract<EmailContent, { template: "booking-scheduled" | "booking-cancelled" | "booking-requested" | "booking-rejected" }>["props"];
 
-function Occurrences({ props }: { props: { occurrences?: { start: number; end: number }[]; timeZone: string; locale: string; hour12: boolean } }) {
+function Occurrences({ props, e }: { props: { occurrences?: { start: number; end: number }[]; timeZone: string; locale: string; hour12: boolean }; e: Mail }) {
   if (!props.occurrences?.length) return <></>;
   return (
     <Text style={styles.text}>
-      <strong>All {props.occurrences.length} dates:</strong>
+      <strong>{e.allDates(props.occurrences.length)}</strong>
       {props.occurrences.map((o) => (
         <span key={o.start}>
           <br />• {formatDateTimeRange(o.start, o.end, props)}
@@ -96,23 +97,25 @@ function Answers({ answers }: { answers?: { label: string; value: string }[] }) 
 /** The booking facts every booking email lists. */
 type BookingSummary = Pick<BookingProps, "audience" | "title" | "start" | "end" | "timeZone" | "locale" | "hour12" | "hostName" | "attendeeName" | "attendeeEmail" | "location">;
 
-function BookingDetails({ props }: { props: BookingSummary }) {
+type Mail = GuestText["email"];
+
+function BookingDetails({ props, e }: { props: BookingSummary; e: Mail }) {
   const when = formatDateTimeRange(props.start, props.end, props);
   const other = props.audience === "attendee" ? props.hostName : `${props.attendeeName} (${props.attendeeEmail})`;
   return (
     <>
       <Text style={styles.text}>
-        <strong>What:</strong> {props.title}
+        <strong>{e.what}:</strong> {props.title}
         <br />
-        <strong>When:</strong> {when}
+        <strong>{e.when}:</strong> {when}
         <br />
-        <strong>Time zone:</strong> {timeZoneLabel(props.timeZone, props.start, props.locale)}
+        <strong>{e.timeZone}:</strong> {timeZoneLabel(props.timeZone, props.start, props.locale)}
         <br />
-        <strong>{props.audience === "attendee" ? "Host" : "Invitee"}:</strong> {other}
+        <strong>{props.audience === "attendee" ? e.host : e.invitee}:</strong> {other}
         {props.location ? (
           <>
             <br />
-            <strong>Where:</strong> {props.location}
+            <strong>{e.where}:</strong> {props.location}
           </>
         ) : null}
       </Text>
@@ -120,8 +123,9 @@ function BookingDetails({ props }: { props: BookingSummary }) {
   );
 }
 
-function build(input: EmailTemplateInput, b: EmailBranding): { subject: string; element: ReactElement; calendar?: CalendarPart } {
+function build(input: EmailTemplateInput, b: EmailBranding, lang: GuestLanguage): { subject: string; element: ReactElement; calendar?: CalendarPart } {
   const button = buttonStyle(b);
+  const e = guestText(lang).email;
   const BOOKING_FOOTER = b.bookingFooter;
   switch (input.template) {
     case "verify-email":
@@ -156,42 +160,42 @@ function build(input: EmailTemplateInput, b: EmailBranding): { subject: string; 
       };
     case "booking-scheduled": {
       const p = input.props;
-      const verb = p.rescheduled ? "Rescheduled" : p.reassigned ? "Updated" : "Confirmed";
+      const verb = p.rescheduled ? e.scheduledVerb.rescheduled : p.reassigned ? e.scheduledVerb.updated : e.scheduledVerb.confirmed;
       const subject = `${verb}: ${p.title} — ${formatDateTimeRange(p.start, p.end, p)}`;
-      const heading = p.rescheduled ? "Your meeting was rescheduled" : p.reassigned ? `Your meeting is now with ${p.hostName}` : p.accepted ? "Your booking was confirmed" : p.occurrences?.length ? "Your recurring meeting is booked" : "Your meeting is booked";
+      const heading = p.rescheduled ? e.headingRescheduled : p.reassigned ? e.headingReassigned(p.hostName) : p.accepted ? e.headingAccepted : p.occurrences?.length ? e.headingRecurring : e.headingBooked;
       return {
         subject,
         calendar: p.ics,
         element: (
-          <Layout branding={b} preview={subject} heading={heading} footer={BOOKING_FOOTER}>
-            <BookingDetails props={p} />
-            <Occurrences props={p} />
+          <Layout branding={b} preview={subject} heading={heading} footer={BOOKING_FOOTER} lang={lang}>
+            <BookingDetails props={p} e={e} />
+            <Occurrences props={p} e={e} />
             <Answers answers={p.answers} />
-            {p.notes ? <Text style={styles.text}>Notes: {p.notes}</Text> : <></>}
+            {p.notes ? <Text style={styles.text}>{e.notes(p.notes)}</Text> : <></>}
             <Button href={p.manageUrl} style={button}>
-              {p.audience === "attendee" ? "Reschedule or cancel" : `View in ${b.appName}`}
+              {p.audience === "attendee" ? e.rescheduleOrCancel : e.viewIn(b.appName)}
             </Button>
-            <Text style={styles.muted}>The calendar invitation is attached.</Text>
+            <Text style={styles.muted}>{e.calendarAttached}</Text>
           </Layout>
         ),
       };
     }
     case "booking-cancelled": {
       const p = input.props;
-      const subject = `Cancelled: ${p.title} — ${formatDateTimeRange(p.start, p.end, p)}`;
+      const subject = `${e.cancelledVerb}: ${p.title} — ${formatDateTimeRange(p.start, p.end, p)}`;
       const by = p.cancelledBy === "host" ? p.hostName : p.cancelledBy === "attendee" ? p.attendeeName : b.appName;
       return {
         subject,
         calendar: p.ics,
         element: (
-          <Layout branding={b} preview={subject} heading="This meeting was cancelled" footer={BOOKING_FOOTER}>
-            <BookingDetails props={p} />
+          <Layout branding={b} preview={subject} heading={e.headingCancelled} footer={BOOKING_FOOTER} lang={lang}>
+            <BookingDetails props={p} e={e} />
             <Text style={styles.text}>
-              Cancelled by {by}.{p.reason ? ` Reason: ${p.reason}` : ""}
+              {e.cancelledBy(by)}{p.reason ? e.reasonSuffix(p.reason) : ""}
             </Text>
             {p.rebookUrl ? (
               <Button href={p.rebookUrl} style={button}>
-                Pick a new time
+                {e.pickNewTime}
               </Button>
             ) : (
               <></>
@@ -203,29 +207,29 @@ function build(input: EmailTemplateInput, b: EmailBranding): { subject: string; 
     case "booking-requested": {
       const p = input.props;
       const host = p.audience === "host";
-      const subject = `${host ? "New booking request" : "Booking requested"}: ${p.title} — ${formatDateTimeRange(p.start, p.end, p)}`;
+      const subject = `${host ? e.requestedHost : e.requestedGuest}: ${p.title} — ${formatDateTimeRange(p.start, p.end, p)}`;
       return {
         subject,
         element: (
-          <Layout branding={b} preview={subject} heading={host ? "Someone wants to book you" : "Your request was sent"} footer={BOOKING_FOOTER}>
-            <BookingDetails props={p} />
-            <Occurrences props={p} />
+          <Layout branding={b} preview={subject} heading={host ? e.headingRequestedHost : e.headingRequestedGuest} footer={BOOKING_FOOTER} lang={lang}>
+            <BookingDetails props={p} e={e} />
+            <Occurrences props={p} e={e} />
             <Answers answers={p.answers} />
-            {p.notes ? <Text style={styles.text}>Notes: {p.notes}</Text> : <></>}
+            {p.notes ? <Text style={styles.text}>{e.notes(p.notes)}</Text> : <></>}
             {host && p.acceptUrl && p.rejectUrl ? (
               <Text style={styles.text}>
                 <Button href={p.acceptUrl} style={button}>
-                  Accept
+                  {e.accept}
                 </Button>{" "}
                 <Button href={p.rejectUrl} style={{ ...button, backgroundColor: "#b91c1c", color: "#ffffff" }}>
-                  Reject
+                  {e.reject}
                 </Button>
               </Text>
             ) : (
-              <Text style={styles.text}>{p.hostName} needs to confirm this booking. You’ll get an email with the calendar invitation once they do.</Text>
+              <Text style={styles.text}>{e.needsConfirmation(p.hostName)}</Text>
             )}
             <Button href={p.manageUrl} style={button}>
-              {host ? "Open your bookings" : "View or cancel the request"}
+              {host ? e.openBookings : e.viewOrCancelRequest}
             </Button>
           </Layout>
         ),
@@ -233,18 +237,18 @@ function build(input: EmailTemplateInput, b: EmailBranding): { subject: string; 
     }
     case "booking-rejected": {
       const p = input.props;
-      const subject = `Declined: ${p.title} — ${formatDateTimeRange(p.start, p.end, p)}`;
+      const subject = `${e.declinedVerb}: ${p.title} — ${formatDateTimeRange(p.start, p.end, p)}`;
       return {
         subject,
         element: (
-          <Layout branding={b} preview={subject} heading="Your booking request was declined" footer={BOOKING_FOOTER}>
-            <BookingDetails props={p} />
+          <Layout branding={b} preview={subject} heading={e.headingDeclined} footer={BOOKING_FOOTER} lang={lang}>
+            <BookingDetails props={p} e={e} />
             <Text style={styles.text}>
-              {p.hostName} can’t make this time.{p.reason ? ` Reason: ${p.reason}` : ""}
+              {e.cantMake(p.hostName)}{p.reason ? e.reasonSuffix(p.reason) : ""}
             </Text>
             {p.rebookUrl ? (
               <Button href={p.rebookUrl} style={button}>
-                Pick another time
+                {e.pickAnotherTime}
               </Button>
             ) : (
               <></>
@@ -255,21 +259,21 @@ function build(input: EmailTemplateInput, b: EmailBranding): { subject: string; 
     }
     case "reschedule-requested": {
       const p = input.props;
-      const subject = `Please pick a new time: ${p.title}`;
+      const subject = e.pickNewTimeSubject(p.title);
       return {
         subject,
         element: (
-          <Layout branding={b} preview={subject} heading={`${p.hostName} asked you to pick a new time`} footer={BOOKING_FOOTER}>
+          <Layout branding={b} preview={subject} heading={e.headingPickNewTime(p.hostName)} footer={BOOKING_FOOTER} lang={lang}>
             <Text style={styles.text}>
-              {p.hostName} can’t make the time below and asked you to choose another one. Your meeting stays booked for this time until you pick a new one.
+              {e.pickNewTimeBody(p.hostName)}
             </Text>
-            {p.message ? <Text style={styles.text}>Message from {p.hostName}: {p.message}</Text> : <></>}
-            <BookingDetails props={p} />
+            {p.message ? <Text style={styles.text}>{e.messageFrom(p.hostName, p.message)}</Text> : <></>}
+            <BookingDetails props={p} e={e} />
             <Button href={p.rescheduleUrl} style={button}>
-              Pick a new time
+              {e.pickNewTime}
             </Button>
             <Text style={styles.muted}>
-              Can’t find a time that works? <a href={p.manageUrl}>View or cancel the booking</a>.
+              {e.cantFindTime} <a href={p.manageUrl}>{e.viewOrCancelBooking}</a>.
             </Text>
           </Layout>
         ),
@@ -280,14 +284,14 @@ function build(input: EmailTemplateInput, b: EmailBranding): { subject: string; 
       return {
         subject: p.subject,
         element: (
-          <Layout branding={b} preview={p.subject} heading={p.subject} footer={BOOKING_FOOTER}>
+          <Layout branding={b} preview={p.subject} heading={p.subject} footer={BOOKING_FOOTER} lang={lang}>
             {p.body.split(/\n{2,}/).map((para, i) => (
               <Text key={i} style={{ ...styles.text, whiteSpace: "pre-line" }}>
                 {para}
               </Text>
             ))}
             <Button href={p.bookingUrl} style={button}>
-              View booking
+              {e.viewBooking}
             </Button>
           </Layout>
         ),
@@ -341,8 +345,9 @@ function build(input: EmailTemplateInput, b: EmailBranding): { subject: string; 
   }
 }
 
-export async function renderEmail(input: EmailTemplateInput, branding: EmailBranding = DEFAULT_EMAIL_BRANDING): Promise<RenderedEmail> {
-  const { subject, element, calendar } = build(input, branding);
+/** `lang` is the guest language (GUEST_LANGUAGE); it applies to booking emails, account emails stay English. */
+export async function renderEmail(input: EmailTemplateInput, branding: EmailBranding = DEFAULT_EMAIL_BRANDING, lang: GuestLanguage = "en"): Promise<RenderedEmail> {
+  const { subject, element, calendar } = build(input, branding, lang);
   const [html, text] = await Promise.all([render(element), render(element, { plainText: true })]);
   return calendar ? { subject, html, text, calendar } : { subject, html, text };
 }

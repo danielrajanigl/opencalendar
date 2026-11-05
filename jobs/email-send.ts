@@ -1,6 +1,7 @@
 import type { Job } from "pg-boss";
 import type { EmailBranding } from "@/features/instance/email-branding";
 import type { Cipher } from "@/lib/crypto/encryption";
+import type { GuestLanguage } from "@/lib/i18n/guest";
 import { renderEmail } from "@/lib/email/templates";
 import type { Mailer } from "@/lib/email/transport";
 import { emailJobPayload, openEmail } from "@/lib/jobs/queues";
@@ -17,6 +18,8 @@ export function createEmailSendHandler(deps: {
   cipher: Cipher;
   /** Current instance branding (ADM-011), read at send time so saved changes apply to queued mail. */
   branding?: () => Promise<EmailBranding>;
+  /** Guest language (GUEST_LANGUAGE) for booking emails. */
+  language?: GuestLanguage;
 }) {
   return async (jobs: Job<unknown>[]): Promise<void> => {
     for (const job of jobs) {
@@ -29,7 +32,7 @@ export function createEmailSendHandler(deps: {
         throw error;
       }
       const { to, ...content } = request;
-      const rendered = await renderEmail(content, await deps.branding?.());
+      const rendered = await renderEmail(content, await deps.branding?.(), deps.language);
       try {
         await deps.mailer.send({ from: deps.from, to, ...rendered });
         logger.info("email.sent", { jobId: job.id, template: content.template });

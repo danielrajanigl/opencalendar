@@ -1,7 +1,8 @@
 import { and, asc, eq, gt, gte, inArray, sql } from "drizzle-orm";
 import type { Database, Tx } from "@/db/client";
 import { booking, eventType, membership, team, teamInvitation, user, workflow } from "@/db/schema";
-import { DEFAULT_REMINDER } from "@/features/workflows/schemas";
+import { defaultReminderFor } from "@/features/workflows/schemas";
+import { guestLanguage } from "@/lib/env";
 import { ensureDefaultSchedule } from "@/features/schedules/server/service";
 import { newId } from "@/lib/ids";
 import type { TeamForm } from "../schemas";
@@ -37,7 +38,7 @@ export async function createTeam(db: Database, userId: string, input: TeamForm):
       await tx.insert(team).values({ id, ...input });
       await tx.insert(membership).values({ teamId: id, userId, role: "owner" });
       // NTF-006/007: teams start with the 24-hour reminder for all their event types.
-      await tx.insert(workflow).values({ id: newId(), ownerUserId: userId, teamId: id, ...DEFAULT_REMINDER, isDefault: true });
+      await tx.insert(workflow).values({ id: newId(), ownerUserId: userId, teamId: id, ...defaultReminderFor(guestLanguage()), isDefault: true });
     });
   } catch (error) {
     if (isUniqueViolation(error)) throw new TeamError("SLUG_TAKEN");

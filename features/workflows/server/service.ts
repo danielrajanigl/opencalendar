@@ -3,7 +3,8 @@ import type { Database } from "@/db/client";
 import { eventType, workflow } from "@/db/schema";
 import { requireTeamRole, TeamError } from "@/features/teams/server/access";
 import { newId } from "@/lib/ids";
-import { DEFAULT_REMINDER, type WorkflowForm } from "../schemas";
+import { guestLanguage } from "@/lib/env";
+import { defaultReminderFor, type WorkflowForm } from "../schemas";
 
 type Tx = Parameters<Parameters<Database["transaction"]>[0]>[0];
 export type WorkflowRow = typeof workflow.$inferSelect;
@@ -17,7 +18,7 @@ export class WorkflowError extends Error {
 
 /** NTF-006: every new event type starts with a 24-hour reminder to attendees. */
 export async function createDefaultReminder(tx: Tx | Database, ownerUserId: string, eventTypeId: string): Promise<void> {
-  await tx.insert(workflow).values({ id: newId(), ownerUserId, eventTypeId, ...DEFAULT_REMINDER, isDefault: true });
+  await tx.insert(workflow).values({ id: newId(), ownerUserId, eventTypeId, ...defaultReminderFor(guestLanguage()), isDefault: true });
 }
 
 /**

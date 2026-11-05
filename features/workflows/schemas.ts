@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { GuestLanguage } from "@/lib/i18n/guest";
 
 export const WORKFLOW_TRIGGERS = ["booking_created", "booking_cancelled", "booking_rescheduled", "before_start", "after_end"] as const;
 export type WorkflowTrigger = (typeof WORKFLOW_TRIGGERS)[number];
@@ -72,3 +73,14 @@ export const DEFAULT_REMINDER: WorkflowForm = {
   body: "Hi {attendee_name},\n\nThis is a reminder of {event_name} with {host_name} on {date} at {time} ({timezone}).\n\nLocation: {location}\nDetails: {booking_url}",
   enabled: true,
 };
+
+/** The default reminder in the guest language (GUEST_LANGUAGE); English is DEFAULT_REMINDER. */
+export function defaultReminderFor(lang: GuestLanguage): WorkflowForm {
+  if (lang === "en") return DEFAULT_REMINDER;
+  return {
+    ...DEFAULT_REMINDER,
+    name: "Erinnerung 24 Stunden vorher",
+    subject: "Erinnerung: {event_name} am {date}",
+    body: "Guten Tag {attendee_name},\n\nwir erinnern Sie an Ihren Termin {event_name} mit {host_name} am {date} um {time} Uhr ({timezone}).\n\nOrt: {location}\nDetails, Verschieben oder Absagen: {booking_url}",
+  };
+}
