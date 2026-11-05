@@ -118,6 +118,8 @@ const baseSchema = z.object({
     emptyToUndefined,
     z.string().url().default(UPSTREAM_SOURCE_URL),
   ),
+  /** Language of everything guests see: booking pages, forms and booking emails. */
+  GUEST_LANGUAGE: z.preprocess(emptyToUndefined, z.enum(["en", "de"]).default("en")),
 });
 
 const schema = baseSchema.superRefine((env, ctx) => {

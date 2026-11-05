@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { headers } from "next/headers";
 import { THEME_SCRIPT, ThemeProvider } from "@/components/theme-provider";
 import { getDb } from "@/db/client";
+import { getEnv } from "@/lib/env";
 import { assetUrl } from "@/features/instance/defaults";
 import { getInstanceSettings } from "@/features/instance/server/service";
 import { themeCss } from "@/features/instance/theme/css";
@@ -31,7 +32,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
   const instanceTheme = themeCss(settings.theme, settings.radius);
   return (
     <html
-      lang="en"
+      lang={getEnv().GUEST_LANGUAGE}
       suppressHydrationWarning
       data-default-theme={settings.defaultTheme}
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}

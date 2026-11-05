@@ -127,3 +127,17 @@ describe("parseEnv", () => {
     expect(env.oauth.google).toBeNull();
   });
 });
+
+describe("GUEST_LANGUAGE", () => {
+  it("defaults to English", () => {
+    expect(parseEnv(base).GUEST_LANGUAGE).toBe("en");
+  });
+
+  it("accepts German", () => {
+    expect(parseEnv({ ...base, GUEST_LANGUAGE: "de" }).GUEST_LANGUAGE).toBe("de");
+  });
+
+  it("rejects an unsupported language", () => {
+    expect(() => parseEnv({ ...base, GUEST_LANGUAGE: "fr" })).toThrow(EnvValidationError);
+  });
+});

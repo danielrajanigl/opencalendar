@@ -142,6 +142,7 @@ with a readable error listing missing/invalid values.
 | `METRICS_TOKEN` | no | | Enables `GET /api/metrics` (Prometheus text) for requests with `Authorization: Bearer <token>` (16+ chars) |
 | `DATABASE_POOL_MAX` | no | `20` | Postgres connections per app process; keep replicas × this + worker below `max_connections` |
 | `SOURCE_URL` | no | `https://github.com/kudretyilmazz/opencalendar` | Target of the "Source code" link in every page footer (AGPL-3.0 §13). **Point it at your fork if you modify OpenCalendar.** |
+| `GUEST_LANGUAGE` | no | `en` | Language of everything guests see (booking pages, forms, booking emails): `en` or `de`. The dashboard stays English. |
 | `PORT` / `HOSTNAME` | no | `3000` / `0.0.0.0` | Standalone server bind |
 
 Not yet available (later milestones): Stripe payments (`STRIPE_*`, M5), third-party CAPTCHA
